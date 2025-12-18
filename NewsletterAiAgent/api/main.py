@@ -17,7 +17,12 @@ app = FastAPI()
 # In production, set a stricter set of allowed origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        # Production frontend (GitHub Pages)
+        "https://muraliikrishnant.github.io",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,6 +41,10 @@ class SendReq(BaseModel):
 
 class PublishReq(BaseModel):
     token: str
+
+@app.get("/")
+def root():
+    return {"ok": True, "message": "Newsletter AI backend running", "endpoints": ["/build", "/send", "/status", "/publish"]}
 
 
 @app.post('/build')
