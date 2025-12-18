@@ -43,8 +43,8 @@ Then open your browser to `http://localhost:3000`
 2. **Configure Source**: 
    - Source: "Deploy from a branch"
    - Branch: `main`
-   - Folder: `/NewsletterAiAgent/docs`
-3. **Save**: GitHub will deploy automatically
+   - Folder: `/docs` (root-level docs folder)
+3. **Save**: GitHub will deploy automatically (we added `.nojekyll` to skip Jekyll)
 4. **Access**: Your site will be at `https://muraliikrishnant.github.io/NewsletterAIAgent_Tars/`
 
 **Note**: The frontend automatically detects production vs local environment and uses the correct API URL.
