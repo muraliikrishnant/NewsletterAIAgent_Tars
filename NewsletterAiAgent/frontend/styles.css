@@ -25,4 +25,3 @@ body{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial
 /* Dark mode toggle support */
 .dark .btn-muted{background:#0b1220;color:#e5e7eb;border-color:#1e293b}
 .dark .chip{border-color:#1e293b;background:#0b1220;color:#cbd5e1}
-

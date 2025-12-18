@@ -8,13 +8,11 @@ hitl_status.json
 *.log
 draft_run_output.html
 generated_from_prompt.html
-.env
 
 # macOS
-.DS_Store
+**/.DS_Store
 
 # Python caches
-__pycache__/
 *.py[cod]
 
 # packaging
@@ -23,3 +21,6 @@ __pycache__/
 # generated artifacts
 *.html
 
+# Project specific sensitive/large files
+*.pdf
+project_report.txt
