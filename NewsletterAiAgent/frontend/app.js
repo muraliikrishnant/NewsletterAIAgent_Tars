@@ -1,7 +1,7 @@
 // Sophisticated frontend logic for Newsletter Studio
-// Auto-detect API base: use production URL if on GitHub Pages, otherwise localhost
-const API_BASE = window.location.hostname === 'muraliikrishnant.github.io' 
-  ? 'https://newsletter-ai-backend.onrender.com'
+// Auto-detect API base: use Render URL in production (GitHub Pages), otherwise localhost
+const API_BASE = window.location.hostname === 'muraliikrishnant.github.io'
+  ? 'https://newsletteraiagent-tars.onrender.com'
   : (window.API_BASE || 'http://127.0.0.1:8000');
 const el = id => document.getElementById(id);
 
