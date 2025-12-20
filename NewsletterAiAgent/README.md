@@ -54,7 +54,7 @@ cp .env.example .env
 - In `.env` set:
 	- `LLM_PROVIDER=gemini`
 	- `GEMINI_API_KEY=your_gemini_key`
-	- `GEMINI_MODEL=gemini-2.0-flash` (or another)
+	- `GEMINI_MODEL=gemini-flash-latest` (or another)
 - You can switch back anytime by setting `LLM_PROVIDER=ollama`.
 
 ## Run it
