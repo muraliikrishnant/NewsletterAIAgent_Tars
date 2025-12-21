@@ -41,8 +41,15 @@ def _sanitize_subject(s: str) -> str:
 def _smtp_client() -> smtplib.SMTP:
     if not (settings.smtp_username and settings.smtp_password and settings.from_email):
         raise RuntimeError("SMTP credentials or FROM_EMAIL missing. Configure .env")
-    server = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
-    server.starttls()
+    
+    # If using port 465, use implicit SSL
+    if settings.smtp_port == 465:
+        server = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port)
+    else:
+        # Default (587 or 25), use STARTTLS
+        server = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        server.starttls()
+    
     server.login(settings.smtp_username, settings.smtp_password)
     return server
 
