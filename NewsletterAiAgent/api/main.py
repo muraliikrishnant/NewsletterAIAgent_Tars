@@ -45,8 +45,12 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://muralii-rutgersstudent.github.io"
+        "http://localhost:8000",
+        "https://muralii-rutgersstudent.github.io",
+        "https://newsletteraiagent-tars.onrender.com",
+        "https://newsletter-ai-frontend.onrender.com",
     ],
+    allow_origin_regex="https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
