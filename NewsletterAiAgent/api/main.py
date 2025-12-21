@@ -71,6 +71,8 @@ def send(req: SendReq):
         final_subject, final_html = review_loop(subject, html, os.getenv('RECIPIENTS', '').split(',') if os.getenv('RECIPIENTS') else [os.getenv('SMTP_USERNAME')])
         return {'subject': final_subject, 'html': final_html, 'token': None}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
