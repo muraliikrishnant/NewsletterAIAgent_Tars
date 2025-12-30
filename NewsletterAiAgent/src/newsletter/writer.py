@@ -61,52 +61,35 @@ def plan_title_and_topics(articles_blob: str) -> Dict[str, Any]:
         return {"title": title, "topics": topics}
 
 
-
 def write_section(topic: str, research_blob: str, force_title: Optional[str] = None) -> str:
-    system = (
-        "You are writing a business newsletter strictly in the blended style of Steven Bartlett and Alex Hormozi. "
-        "Tone constraints (must follow):\n"
-        "- Bartlett: start with a personal story or reflective hook; emotionally resonant; human, vulnerable.\n"
-        "- Hormozi: convert insight into sharp, tactical lessons with numbers, frameworks, and direct language.\n"
-        "- Sentences: mostly short. Rhythm: alternate punchy one-liners with slightly longer, flowing thoughts.\n"
-        "- Cut fluff. Speak to a smart but busy operator.\n"
-        "Structure constraints:\n"
-        "- Always start with a clear <h2> section title.\n"
-        "- Then 2–5 short paragraphs (2–4 sentences each).\n"
-        "- End the section with 3–5 actionable bullets labeled 'Playbook' (if relevant).\n"
-        "Evidence constraints: if citing facts, include real sources as clickable URLs under a final 'Sources' sub-block. No fabricated links.\n"
-        "Important: Do NOT output the word 'Source' or 'Sources' anywhere in the text or next to links — strip that token entirely.\n"
-        "Output HTML only (no markdown). No overall title or conclusion."
-    )
     title_hint = f"Use this exact section title: {force_title}\n\n" if force_title else ""
     user = f"{title_hint}Topic: {topic}\n\nResearch: {research_blob}"
-    # Use the style-aware generator so the Bartlett+Hormozi voice and examples are applied
-    resp = generate_with_style(user, style_name="bartlett_hormozi")
+    # Use the style-aware generator with the new Tars tone
+    resp = generate_with_style(user, style_name="tars")
     return _remove_source_tokens(resp or "")
 
 
 def merge_sections_to_html(title: str, sections: List[str], words_limit: Optional[int] = None) -> Tuple[str, str]:
     today = dt.date.today().isoformat()
-    system = (
-        "You are an expert newsletter editor. Merge the provided sections into a cohesive, email-ready HTML body with a holistic introduction and conclusion. "
-        "Maintain a professional, concise tone for a business audience and preserve intended meaning. Be as detailed as needed to fully cover the topics; avoid fluff. "
-        "Enforce style: blended Steven Bartlett (reflective human hook) + Alex Hormozi (tactical, numbers-first lessons). Keep sentences short; vary rhythm.\n"
-        "Structure (HTML only):\n"
-        "1) <p> Introduction that frames all topics and their relevance; reference today’s date: "
-        f"{today}.\n"
-    "2) For each provided section: <h2> Use the given title when present; edited <p> content; inline clickable citations using <a href=\"https://...\">Link</a>. Include <img src=\"...\" width=\"600\"> if appropriate.\n"
-    "Important: Do NOT output the word 'Source' or 'Sources' anywhere in the text; if you would otherwise include it, omit it.\n"
-        "3) <h3>Sources</h3><ul> consolidated list, deduplicated, alphabetized by Publication Name.\n"
-        "4) <p> Conclusion tying threads together with implications or next steps.\n"
-        "Only use basic HTML tags (<h2>, <h3>, <p>, <ul>, <li>, <a>, <img>). No scripts or external styles.\n"
-        "Output format: 'Subject: ...' then blank line, then 'Content:' then HTML body only."
+    instructions = (
+        f"Context: Today is {today}.\n"
+        "Task: Merge the provided sections into a cohesive, email-ready HTML body.\n"
+        "Structure:\n"
+        "1. <p> Introduction: Frame the topics relevantly (Tars tone: decisive, impact-focused).\n"
+        "2. Sections: Use <h2> for titles. Edit for flow and Tars tone (no-fluff, engineering precision).\n"
+        "3. <h3>Sources</h3>: Consolidated list of all citations.\n"
+        "4. <p> Conclusion: Brief wrap-up or call to action.\n"
+        "Note: Do NOT output 'Source' word in text. Output pure HTML.\n"
     )
+
     if words_limit:
-        system += (
-            f" Aim for approximately {words_limit} words total (+/-10%). If above target, summarize while preserving facts and citations; if below, expand with concrete, cited details."
+        instructions += (
+            f"Aim for approximately {words_limit} words total (+/-10%). If above target, summarize; if below, expand."
         )
-    user = f"Title: {title}\n\n" + "\n\n".join(sections)
-    content = generate_with_style(user, style_name="bartlett_hormozi")
+
+    user = f"{instructions}\n\nTitle: {title}\n\nContent Sections:\n" + "\n\n".join(sections)
+    content = generate_with_style(user, style_name="tars")
+    
     # Best-effort split
     subject = _sanitize_subject(f"{title} — Weekly Newsletter")
     if content.startswith("Subject:"):
