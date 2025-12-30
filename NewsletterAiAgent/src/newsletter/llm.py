@@ -59,7 +59,7 @@ def simple_chat(system: str, user: str) -> str:
 
 
 def _load_style_assets(style_name: str = "bartlett_hormozi") -> tuple[str, list]:
-    base = os.path.join(os.path.dirname(__file__), '..', 'style_guides')
+    base = os.path.join(os.path.dirname(__file__), '..', '..', 'style_guides')
     md_path = os.path.abspath(os.path.join(base, f"{style_name}.md"))
     json_path = os.path.abspath(os.path.join(os.path.dirname(md_path), '..', 'style_examples', f"{style_name}.json"))
     guide = ''
@@ -68,7 +68,8 @@ def _load_style_assets(style_name: str = "bartlett_hormozi") -> tuple[str, list]
         if os.path.exists(md_path):
             with open(md_path, 'r', encoding='utf-8') as f:
                 guide = f.read()
-    except Exception:
+    except Exception as e:
+        print(f"Failed to load style markdown from {md_path}: {e}")
         guide = ''
     try:
         if os.path.exists(json_path):

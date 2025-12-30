@@ -179,6 +179,8 @@ def build(req: BuildReq):
         subject, html = build_newsletter(req.prompt, words_limit=req.words)
         return {'subject': subject, 'html': html}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -204,6 +206,8 @@ def send(req: SendReq, background_tasks: BackgroundTasks):
             'message': 'Review loop started in background. Check your email.'
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
