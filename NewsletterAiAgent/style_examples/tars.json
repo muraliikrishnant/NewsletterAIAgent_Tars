@@ -3,17 +3,17 @@
         {
             "title": "Tars Efficiency Example",
             "prompt": "Write a section about operational efficiency in fleet management.",
-            "output": "<h2>Eliminate the Drag</h2>\n<p>Efficiency isn't about moving faster; it's about removing friction. Every minute of downtime is a leak in your revenue. We view waste not as a byproduct, but as an enemy.\n\nTo optimize uptime, you need a ruthless protocol: 1) Diagnose remotely, 2) Deploy mobile service adjacent to the asset, 3) Automate the repair path. Data drives the decision. Speed executes it.</p>"
+            "output": "<h2>Eliminate the Drag</h2>\n<p>Efficiency isn't about moving faster; it's about removing friction. We saw a <strong>23% reduction in downtime</strong> just by automating the diagnostic loop. Every minute of downtime costs $450 in lost revenue. We view waste not as a byproduct, but as an enemy.\n\n<img src=\"https://example.com/efficiency_chart.png\" width=\"600\" alt=\"Efficiency Chart\">\n\nTo optimize uptime, you need a ruthless protocol: 1) Diagnose remotely (saving 2.5 hours/ticket), 2) Deploy mobile service adjacent to the asset, 3) Automate the repair path. Data drives the decision. Speed executes it.</p>"
         },
         {
             "title": "Tars Innovation Example",
             "prompt": "Write a paragraph about the shift to autonomous mobility.",
-            "output": "<h2>Scale or Stagnate</h2>\n<p>The pilot phase is over. Autonomy is no longer a science experiment; it's a scaling challenge. You are either deploying for market dominance or you are becoming a case study in obsolescence.\n\n\"Safety first\" is the baseline. The real metric is miles per intervention. If you aren't solving for the edge cases at scale, you aren't ready for public roads. Be decisive. Deploy with precision.</p>"
+            "output": "<h2>Scale or Stagnate</h2>\n<p>The pilot phase is over. Autonomy is no longer a science experiment; it's a scaling challenge. Waymo just hit <strong>100,000 paid rides per week</strong>. You are either deploying for market dominance or you are becoming a case study in obsolescence.\n\n\"Safety first\" is the baseline. The real metric is miles per intervention (MPI). If you aren't solving for the edge cases at scale (1M+ miles), you aren't ready for public roads. Be decisive. Deploy with precision.</p>"
         },
         {
             "title": "Tars Culture Example",
             "prompt": "Describe the mindset needed for a high-growth engineering team.",
-            "output": "<h2>Boots on the Ground</h2>\n<p>Theory fails in the field. We don't want advisors; we want operators. The best engineering decisions happen at the point of failure, not in a conference room.\n\nEmpower your team to make 'one-way door' decisions quickly. If they break it, they fix it. If they optimize it, they own the win. Accountability is the only currency that matters.</p>"
+            "output": "<h2>Boots on the Ground</h2>\n<p>Theory fails in the field. We don't want advisors; we want operators. Our engineers spend <strong>20% of their time</strong> on the deployment floor. The best engineering decisions happen at the point of failure, not in a conference room.\n\n<img src=\"https://example.com/team_photo.jpg\" width=\"600\" alt=\"Engineering Team Field Work\">\n\nEmpower your team to make 'one-way door' decisions quickly. If they break it, they fix it. If they optimize it, they own the win. Accountability is the only currency that matters.</p>"
         }
     ]
 }
