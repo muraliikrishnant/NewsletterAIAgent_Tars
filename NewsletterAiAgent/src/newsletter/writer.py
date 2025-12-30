@@ -63,7 +63,14 @@ def plan_title_and_topics(articles_blob: str) -> Dict[str, Any]:
 
 def write_section(topic: str, research_blob: str, force_title: Optional[str] = None) -> str:
     title_hint = f"Use this exact section title: {force_title}\n\n" if force_title else ""
-    user = f"{title_hint}Topic: {topic}\n\nResearch: {research_blob}"
+    user = (
+        f"{title_hint}Topic: {topic}\n\nResearch Data:\n{research_blob}\n\n"
+        "Instructions:\n"
+        "1. Prioritize Tars tone: Punchy, impactful, no-fluff, highly statistical (use provided numbers/ratios).\n"
+        "2. VISUALS: The provided research blob may contain an 'images' list. If valid image URLs exist, you MUST select 1-2 relevant ones "
+        "and embed them in the HTML using <img src='...' width='600'> tags. Place them contextually where they illustrate a point.\n"
+        "3. Output pure HTML."
+    )
     # Use the style-aware generator with the new Tars tone
     resp = generate_with_style(user, style_name="tars")
     return _remove_source_tokens(resp or "")
@@ -75,10 +82,11 @@ def merge_sections_to_html(title: str, sections: List[str], words_limit: Optiona
         f"Context: Today is {today}.\n"
         "Task: Merge the provided sections into a cohesive, email-ready HTML body.\n"
         "Structure:\n"
-        "1. <p> Introduction: Frame the topics relevantly (Tars tone: decisive, impact-focused).\n"
-        "2. Sections: Use <h2> for titles. Edit for flow and Tars tone (no-fluff, engineering precision).\n"
-        "3. <h3>Sources</h3>: Consolidated list of all citations.\n"
-        "4. <p> Conclusion: Brief wrap-up or call to action.\n"
+        "1. <p> Introduction: Frame the topics relevantly (Tars tone: decisive, impact-focused, statistical).\n"
+        "2. Sections: Use <h2> for titles. Edit for flow and Tars tone (punchy, data-driven, engineering precision).\n"
+        "3. VISUALS: Ensure image tags (<img src...>) from the sections are preserved. If specific sections lack images but the content allows, suggest where a chart might go (or use generic placeholders if no URL is available).\n"
+        "4. <h3>Sources</h3>: Consolidated list of all citations.\n"
+        "5. <p> Conclusion: Brief wrap-up or call to action.\n"
         "Note: Do NOT output 'Source' word in text. Output pure HTML.\n"
     )
 
