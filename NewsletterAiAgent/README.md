@@ -5,7 +5,7 @@ An end-to-end Python project that builds a research-backed business newsletter u
 ## What it does
 - Takes a prompt/brief
 - Uses Tavily for initial research and topic deep-dives (with raw content + images)
-- Uses a local LLM (Ollama by default) to plan title + topics, write three sections, and merge to an HTML email
+- Uses Gemini LLM to plan title + topics, write three sections, and merge to an HTML email
 - Adds image links to the email body
 - Sends a draft email to reviewers and waits for feedback
 - If approved → sends final. If declined → revises with LLM and loops (max N times)
@@ -57,25 +57,6 @@ cp .env.example .env
 	- `GEMINI_MODEL=gemini-flash-latest` (or another)
 - You can switch back anytime by setting `LLM_PROVIDER=ollama`.
 
-### Style controls (Bartlett + Hormozi-inspired)
-- `STYLE_NAME=bartlett_hormozi` (default)
-- `STYLE_EXAMPLES_COUNT=3` (how many few-shot examples to include)
-- `VOICE_POLISH=true` (adds a final voice pass)
-- `VOICE_POLISH_PASSES=1` (increase if you want stronger voice lock-in)
-
-### Word count limits
-- Defaults to 100–5000 words on the backend (customize via `MIN_WORDS` and `MAX_WORDS` in `.env`).
-- The frontend slider defaults to 100–500 to keep UI fast; you can still pass higher values via CLI or API.
-
-### Local image generation (optional)
-If you want free local images, run a local AUTOMATIC1111 Stable Diffusion WebUI and set:
-- `IMAGE_PROVIDER=auto1111`
-- `AUTO1111_URL=http://127.0.0.1:7860`
-- `IMAGE_BASE_URL=http://your-backend-host:8000` (must be reachable by email clients)
-- Optional: `IMAGE_COUNT`, `IMAGE_WIDTH`, `IMAGE_HEIGHT`, `IMAGE_STEPS`, `IMAGE_CFG_SCALE`, `IMAGE_SAMPLER`
-
-Generated images are hosted by the API at `/images/*` for reliable email rendering.
-
 ## Run it
 ```
 python -m newsletter.run "Write a newsletter about AI agents in business ops"
@@ -107,7 +88,6 @@ This will:
 - Ollama tool-calling for live browsing is not used here; instead, we use Tavily for research. This keeps the model local and predictable.
 - For images, we insert up to 3 top image links at the top of the email for inbox compatibility; full inline image embedding could be added with attachments or hosted URLs.
 - Gmail requires App Passwords when 2FA is on. Ensure IMAP is enabled in Gmail settings.
-- For fine-tuning scaffolding, see `NewsletterAiAgent/training/README.md`.
 
 ## Project layout
 - `src/newsletter/config.py` – Configuration via env vars

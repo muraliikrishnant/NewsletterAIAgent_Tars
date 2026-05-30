@@ -59,7 +59,7 @@ def simple_chat(system: str, user: str) -> str:
 
 
 def _load_style_assets(style_name: str = "bartlett_hormozi") -> tuple[str, list]:
-    base = os.path.join(os.path.dirname(__file__), '..', 'style_guides')
+    base = os.path.join(os.path.dirname(__file__), '..', '..', 'style_guides')
     md_path = os.path.abspath(os.path.join(base, f"{style_name}.md"))
     json_path = os.path.abspath(os.path.join(os.path.dirname(md_path), '..', 'style_examples', f"{style_name}.json"))
     guide = ''
@@ -68,7 +68,8 @@ def _load_style_assets(style_name: str = "bartlett_hormozi") -> tuple[str, list]
         if os.path.exists(md_path):
             with open(md_path, 'r', encoding='utf-8') as f:
                 guide = f.read()
-    except Exception:
+    except Exception as e:
+        print(f"Failed to load style markdown from {md_path}: {e}")
         guide = ''
     try:
         if os.path.exists(json_path):
@@ -80,19 +81,16 @@ def _load_style_assets(style_name: str = "bartlett_hormozi") -> tuple[str, list]
     return guide, examples
 
 
-def generate_with_style(task_prompt: str, style_name: Optional[str] = None, examples_limit: Optional[int] = None) -> str:
+def generate_with_style(task_prompt: str, style_name: str = "bartlett_hormozi") -> str:
     """Compose a prompt using the selected style guide and few-shot examples and call the default chat provider."""
-    style = style_name or settings.style_name or "bartlett_hormozi"
-    limit = settings.style_examples_count if examples_limit is None else examples_limit
-    guide, examples = _load_style_assets(style)
+    guide, examples = _load_style_assets(style_name)
     system_parts = [guide] if guide else []
     # include example prompts in system message to bias the model
-    if isinstance(limit, int) and limit > 0:
-        for ex in examples[:limit]:
-            p = ex.get("prompt") if isinstance(ex, dict) else None
-            out = ex.get("output") if isinstance(ex, dict) else None
-            if p and out:
-                system_parts.append(f"Example prompt:\n{p}\nExample output:\n{out}")
+    for ex in examples[:3]:
+        p = ex.get('prompt') if isinstance(ex, dict) else None
+        out = ex.get('output') if isinstance(ex, dict) else None
+        if p and out:
+            system_parts.append(f"Example prompt:\n{p}\nExample output:\n{out}")
     system = "\n\n".join([s for s in system_parts if s]) or "You are an expert newsletter writer."
     # call whichever provider is configured
     return simple_chat(system, task_prompt)

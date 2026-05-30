@@ -8,9 +8,7 @@ from typing import Any, Dict, List, Tuple, Optional
 from bs4 import BeautifulSoup
 
 from .llm import simple_chat, ChatMessage, OllamaClient, generate_with_style
-from .config import settings
 from .email_client import _sanitize_subject
-from .voice_validator import validate_and_score
 
 
 def _remove_source_tokens(text: str) -> str:
@@ -63,72 +61,43 @@ def plan_title_and_topics(articles_blob: str) -> Dict[str, Any]:
         return {"title": title, "topics": topics}
 
 
-
 def write_section(topic: str, research_blob: str, force_title: Optional[str] = None) -> str:
-    system = (
-        "You are writing a business newsletter in a style inspired by a blended Steven Bartlett + Alex Hormozi voice. "
-        "Tone constraints (must follow):\n"
-        "- Bartlett: start with a personal story or reflective hook; emotionally resonant; human, vulnerable.\n"
-        "- Hormozi: convert insight into sharp, tactical lessons with numbers, frameworks, and direct language.\n"
-        "- Sentences: mostly short. Rhythm: alternate punchy one-liners with slightly longer, flowing thoughts.\n"
-        "- Cut fluff. Speak to a smart but busy operator.\n"
-        "Structure constraints:\n"
-        "- Always start with a clear <h2> section title.\n"
-        "- Then 2–5 short paragraphs (2–4 sentences each).\n"
-        "- End the section with 3–5 actionable bullets labeled 'Playbook' (if relevant).\n"
-        "Evidence constraints: if citing facts, include real sources as clickable URLs under a final 'Sources' sub-block. No fabricated links.\n"
-        "Important: Do NOT output the word 'Source' or 'Sources' anywhere in the text or next to links — strip that token entirely.\n"
-        "Output HTML only (no markdown). No overall title or conclusion."
-    )
     title_hint = f"Use this exact section title: {force_title}\n\n" if force_title else ""
-    user = f"{title_hint}Topic: {topic}\n\nResearch: {research_blob}"
-    
-    # Use the style-aware generator with retry logic for voice consistency
-    max_attempts = 3
-    for attempt in range(max_attempts):
-        resp = generate_with_style(user, style_name=settings.style_name)
-        resp = _remove_source_tokens(resp or "")
-        
-        # Validate voice quality
-        validation = validate_and_score(resp)
-        
-        if validation["valid"] or attempt == max_attempts - 1:
-            # Voice is good enough or we've exhausted retries
-            if not validation["valid"] and attempt == max_attempts - 1:
-                print(f"⚠️  Voice validation score: {validation['score']}/100 after {max_attempts} attempts")
-                if validation.get("suggestions"):
-                    print(f"   Suggestions: {', '.join(validation['suggestions'][:3])}")
-            return resp
-        
-        # Voice needs improvement - retry with stronger constraints
-        print(f"🔄 Voice score {validation['score']}/100, retrying with stronger prompts (attempt {attempt + 2}/{max_attempts})...")
-        user = f"{title_hint}Topic: {topic}\n\nResearch: {research_blob}\n\nIMPORTANT CORRECTIONS NEEDED:\n" + "\n".join(f"- {s}" for s in validation["suggestions"][:3])
-    
-    return resp
+    user = (
+        f"{title_hint}Topic: {topic}\n\nResearch Data:\n{research_blob}\n\n"
+        "Instructions:\n"
+        "1. Prioritize Tars tone: Punchy, impactful, no-fluff, highly statistical (use provided numbers/ratios).\n"
+        "2. VISUALS: The provided research blob may contain an 'images' list. If valid image URLs exist, you MUST select 1-2 relevant ones "
+        "and embed them in the HTML using <img src='...' width='600'> tags. Place them contextually where they illustrate a point.\n"
+        "3. Output pure HTML."
+    )
+    # Use the style-aware generator with the new Tars tone
+    resp = generate_with_style(user, style_name="tars")
+    return _remove_source_tokens(resp or "")
 
 
 def merge_sections_to_html(title: str, sections: List[str], words_limit: Optional[int] = None) -> Tuple[str, str]:
     today = dt.date.today().isoformat()
-    system = (
-        "You are an expert newsletter editor. Merge the provided sections into a cohesive, email-ready HTML body with a holistic introduction and conclusion. "
-        "Maintain a professional, concise tone for a business audience and preserve intended meaning. Be as detailed as needed to fully cover the topics; avoid fluff. "
-        "Enforce style: inspired blended Steven Bartlett (reflective human hook) + Alex Hormozi (tactical, numbers-first lessons). Keep sentences short; vary rhythm.\n"
-        "Structure (HTML only):\n"
-        "1) <p> Introduction that frames all topics and their relevance; reference today’s date: "
-        f"{today}.\n"
-    "2) For each provided section: <h2> Use the given title when present; edited <p> content; NO inline clickable citations. Never give me clickable inline citations using <a href=\"https://...\">Link</a>. Include <img src=\"...\" width=\"600\"> if appropriate.\n"
-    "Important: Do NOT output the word 'Source' or 'Sources' anywhere in the text; if you would otherwise include it, omit it.\n"
-        "3) <h3>Sources</h3><ul> consolidated list, deduplicated, alphabetized by Publication Name.\n"
-        "4) <p> Conclusion tying threads together with implications or next steps.\n"
-        "Only use basic HTML tags (<h2>, <h3>, <p>, <ul>, <li>, <a>, <img>). No scripts or external styles.\n"
-        "Output format: 'Subject: ...' then blank line, then 'Content:' then HTML body only."
+    instructions = (
+        f"Context: Today is {today}.\n"
+        "Task: Merge the provided sections into a cohesive, email-ready HTML body.\n"
+        "Structure:\n"
+        "1. <p> Introduction: Frame the topics relevantly (Tars tone: decisive, impact-focused, statistical).\n"
+        "2. Sections: Use <h2> for titles. Edit for flow and Tars tone (punchy, data-driven, engineering precision).\n"
+        "3. VISUALS: Ensure image tags (<img src...>) from the sections are preserved. If specific sections lack images but the content allows, suggest where a chart might go (or use generic placeholders if no URL is available).\n"
+        "4. <h3>Sources</h3>: Consolidated list of all citations.\n"
+        "5. <p> Conclusion: Brief wrap-up or call to action.\n"
+        "Note: Do NOT output 'Source' word in text. Output pure HTML.\n"
     )
+
     if words_limit:
-        system += (
-            f" Aim for approximately {words_limit} words total (+/-10%). If above target, summarize while preserving facts and citations; if below, expand with concrete, cited details."
+        instructions += (
+            f"Aim for approximately {words_limit} words total (+/-10%). If above target, summarize; if below, expand."
         )
-    user = f"Title: {title}\n\n" + "\n\n".join(sections)
-    content = generate_with_style(user, style_name=settings.style_name)
+
+    user = f"{instructions}\n\nTitle: {title}\n\nContent Sections:\n" + "\n\n".join(sections)
+    content = generate_with_style(user, style_name="tars")
+    
     # Best-effort split
     subject = _sanitize_subject(f"{title} — Weekly Newsletter")
     if content.startswith("Subject:"):
@@ -164,77 +133,11 @@ def revise_with_feedback(original_email_html: str, feedback: str) -> Tuple[str, 
         "Important: Do NOT include the word 'Source' or 'Sources' anywhere in your reply."
     )
     user = f"Email HTML:\n{original_email_html}\n\nFeedback from human:\n{feedback}"
-    reply = generate_with_style(f"{system}\n\n{user}", style_name=settings.style_name)
+    reply = simple_chat(system, user)
     if "---SUBJECT---" in reply:
         subject, body = reply.split("---SUBJECT---", 1)
         return _remove_source_tokens(subject.strip()), _remove_source_tokens(body.strip())
     return _sanitize_subject("Revised Newsletter"), reply.strip()
-
-
-def voice_polish_html(html_body: str, brief: str, words_limit: Optional[int] = None) -> str:
-    """Rewrite HTML into the target voice while keeping structure and citations intact."""
-    
-    # First check if voice polishing is needed
-    initial_validation = validate_and_score(html_body)
-    if initial_validation["valid"] and initial_validation["score"] >= 85:
-        print(f"✅ Voice already strong ({initial_validation['score']}/100), skipping polish")
-        return html_body
-    
-    print(f"🎨 Voice polishing (initial score: {initial_validation['score']}/100)...")
-    
-    # Build strong voice enforcement prompt
-    voice_requirements = [
-        "SHORT SENTENCES: Average 10-15 words per sentence. Mix one-liners with longer explanatory sentences.",
-        "CONTRACTIONS: Use don't, won't, can't, you're, it's, that's - never use 'do not' or 'cannot'",
-        "DIRECT QUESTIONS: Include at least 2 questions that force reader action",
-        "SPECIFIC NUMBERS: Use concrete data - percentages, dollar amounts, timeframes",
-        "ACTION VERBS: Start sentences with verbs like: Stop, Start, Fix, Build, Cut, Ship",
-        "EMOTIONAL HOOKS: Include vulnerability - mention fear, mistakes, or failures",
-        "NO HEDGING: Remove might, maybe, perhaps, possibly - be definitive",
-        "NO FLUFF: Cut 'In today's newsletter', 'Let's dive in', 'Welcome to'",
-        "NO GENERIC PRAISE: Avoid 'interesting', 'amazing' without concrete reasons",
-    ]
-    
-    system = (
-        "You are Steven Bartlett and Alex Hormozi's voice ghostwriter. "
-        "Transform this newsletter HTML to sound EXACTLY like they speak - not how they write formally, but how they SPEAK. "
-        "Imagine this is a transcript from their podcast where they're fired up about the topic.\n\n"
-        "MANDATORY VOICE REQUIREMENTS:\n" + "\n".join(f"{i+1}. {req}" for i, req in enumerate(voice_requirements)) +
-        "\n\nKEEP STRUCTURE: Same sections, same URLs, same facts. Only change the VOICE.\n"
-        "Output HTML only with tags: <h2>, <h3>, <p>, <ul>, <li>, <a>, <img>."
-    )
-    
-    if words_limit:
-        system += f"\n\nWORD COUNT: Target {words_limit} words (+/-10%)."
-    
-    # Add specific suggestions from validation
-    if initial_validation.get("suggestions"):
-        system += f"\n\nFIX THESE ISSUES:\n" + "\n".join(f"- {s}" for s in initial_validation["suggestions"])
-    
-    user = f"Brief:\n{brief}\n\nHTML to transform:\n{html_body}"
-    
-    # Polish with multiple passes if needed
-    max_passes = min(3, settings.voice_polish_passes) if hasattr(settings, 'voice_polish_passes') else 2
-    current_html = html_body
-    
-    for pass_num in range(max_passes):
-        polished = generate_with_style(f"{system}\n\n{user}", style_name=settings.style_name)
-        polished = _remove_source_tokens(polished or current_html)
-        
-        # Validate the polished version
-        validation = validate_and_score(polished)
-        print(f"   Pass {pass_num + 1}: Voice score {validation['score']}/100")
-        
-        if validation["valid"] and validation["score"] >= 80:
-            return polished
-        
-        # Prepare for next pass with targeted improvements
-        if pass_num < max_passes - 1:
-            system += f"\n\nPREVIOUS ATTEMPT ISSUES:\n" + "\n".join(f"- {s}" for s in validation.get("suggestions", [])[:3])
-            current_html = polished
-    
-    # Return best attempt
-    return polished
 
 
 def enforce_on_topic_and_length(html_body: str, prompt: str, required_terms: List[str], target_words: Optional[int] = None) -> str:
@@ -267,5 +170,5 @@ def enforce_on_topic_and_length(html_body: str, prompt: str, required_terms: Lis
     user = (
         "User brief:\n" + prompt + "\n\nCurrent HTML body:\n" + html_body + "\n\nInstructions:\n- " + "\n- ".join(instructions)
     )
-    revised = generate_with_style(f"{system}\n\n{user}", style_name=settings.style_name)
+    revised = simple_chat(system, user)
     return revised or html_body
