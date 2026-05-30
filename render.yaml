@@ -9,12 +9,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.0
       - key: LLM_PROVIDER
-        value: ollama
-      - key: OLLAMA_HOST
-        value: https://ollama.com
-      - key: OLLAMA_MODEL
-        value: gemma4:31b-cloud
-      - key: OLLAMA_API_KEY
         sync: false
       - key: GEMINI_API_KEY
         sync: false

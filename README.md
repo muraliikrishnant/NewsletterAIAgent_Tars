@@ -26,21 +26,15 @@ Then open your browser to `http://localhost:3000`
 4. **Auto-Deploy**: Render will detect `render.yaml` and configure automatically
 5. **Add Environment Variables** in Render Dashboard:
    - `LLM_PROVIDER=ollama`
-   - `OLLAMA_HOST=https://ollama.com`
-   - `OLLAMA_MODEL=gemma4:31b-cloud`
-   - `OLLAMA_API_KEY=your_ollama_cloud_api_key`
+   - `OLLAMA_HOST=http://your-ollama-host:11434` (must be reachable from Render)
+   - `OLLAMA_MODEL=llama3.1:8b-instruct`
    - `TAVILY_API_KEY=your_key`
-   - `SMTP_HOST=smtp.gmail.com`
-   - `SMTP_PORT=587`
    - `SMTP_USERNAME=your_gmail`
-   - `SMTP_PASSWORD=your_gmail_app_password`
-   - `IMAP_HOST=imap.gmail.com`
-   - `IMAP_PORT=993`
+   - `SMTP_PASSWORD=your_app_password`
    - `IMAP_USERNAME=your_gmail`
-   - `IMAP_PASSWORD=your_gmail_app_password`
-   - `FROM_EMAIL=your_gmail`
-   - `FROM_NAME=TARS Group`
-   - `RECIPIENTS=recipient@example.com`
+   - `IMAP_PASSWORD=your_app_password`
+   - `EMAIL_SENDER=your_gmail`
+   - `RECIPIENTS=["recipient@example.com"]`
 6. **Deploy**: Click "Create Web Service"
 7. **Copy URL**: Note your deployed URL (e.g., `https://newsletter-ai-backend.onrender.com`)
 

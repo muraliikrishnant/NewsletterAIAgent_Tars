@@ -20,8 +20,6 @@ class ChatMessage:
 class OllamaClient:
     def __init__(self, base_url: str | None = None, model: str | None = None):
         self.base_url = (base_url or settings.ollama_host).rstrip("/")
-        if self.base_url.endswith("/api"):
-            self.base_url = self.base_url[:-4]
         self.model = model or settings.ollama_model
 
     def chat(self, messages: List[ChatMessage], temperature: float = 0.3, tools: Optional[List[Dict[str, Any]]] = None, stream: bool = False) -> str:
@@ -36,8 +34,6 @@ class OllamaClient:
         if tools:
             payload["tools"] = tools
         headers = {"Content-Type": "application/json"}
-        if settings.ollama_api_key:
-            headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
         resp = requests.post(url, data=json.dumps(payload), headers=headers, timeout=120)
         resp.raise_for_status()
         data = resp.json()
