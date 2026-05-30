@@ -197,6 +197,11 @@ def diag_config():
         "imap_username": settings.imap_username or "(not set)",
         "imap_password": "***" if settings.imap_password else "(not set)",
         "recipients": settings.default_recipients or "(not set)",
+        "llm_provider": settings.llm_provider or "(not set)",
+        "ollama_host": settings.ollama_host or "(not set)",
+        "ollama_model": settings.ollama_model or "(not set)",
+        "gemini_api_key": "***" if settings.gemini_api_key else "(not set)",
+        "gemini_model": settings.gemini_model or "(not set)",
     }
 
 
