@@ -15,12 +15,6 @@ def _env_first(*keys: str, default: str | None = None) -> str | None:
     return default
 
 
-def _default_llm_provider() -> str:
-    if os.getenv("GEMINI_API_KEY", "").strip():
-        return "gemini"
-    return "ollama"
-
-
 def _default_recipients() -> List[str]:
     val = os.getenv("RECIPIENTS", "").strip()
     if not val:
@@ -33,7 +27,7 @@ class Settings:
     # LLM
     ollama_host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct")
-    llm_provider: str = os.getenv("LLM_PROVIDER", _default_llm_provider())  # 'ollama' or 'gemini'
+    llm_provider: str = os.getenv("LLM_PROVIDER", "ollama")  # 'ollama' or 'gemini'
 
     # Style & voice
     style_name: str = os.getenv("STYLE_NAME", "bartlett_hormozi")
