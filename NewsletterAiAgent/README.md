@@ -49,6 +49,17 @@ cp .env.example .env
 4) Verify Ollama is running
 - Default: http://localhost:11434
 
+
+### Use Ollama Cloud on Render
+Set these Render environment variables for the hosted Gemma 4 model:
+
+- `LLM_PROVIDER=ollama`
+- `OLLAMA_HOST=https://ollama.com`
+- `OLLAMA_MODEL=gemma4:31b-cloud`
+- `OLLAMA_API_KEY=your_ollama_cloud_api_key`
+
+The backend sends `OLLAMA_API_KEY` as a bearer token to Ollama Cloud. For local Ollama, use `OLLAMA_HOST=http://localhost:11434` and a local model instead.
+
 ### Use Gemini instead of Ollama (optional)
 - Install the extra dependency (already in requirements.txt): `pip install google-generativeai`
 - In `.env` set:

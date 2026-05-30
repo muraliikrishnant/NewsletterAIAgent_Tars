@@ -200,6 +200,7 @@ def diag_config():
         "llm_provider": settings.llm_provider or "(not set)",
         "ollama_host": settings.ollama_host or "(not set)",
         "ollama_model": settings.ollama_model or "(not set)",
+        "ollama_api_key": "***" if settings.ollama_api_key else "(not set)",
         "gemini_api_key": "***" if settings.gemini_api_key else "(not set)",
         "gemini_model": settings.gemini_model or "(not set)",
     }
@@ -219,6 +220,9 @@ def build(req: BuildReq):
 @app.post('/send')
 def send(req: SendReq, background_tasks: BackgroundTasks):
     try:
+        # Fail fast when email settings are missing so HITL does not silently fail after the response.
+        validate_email_settings()
+
         # 1. Generate the newsletter logic synchronously
         subject, html = build_newsletter(req.prompt, words_limit=req.words)
         
@@ -246,7 +250,7 @@ def send(req: SendReq, background_tasks: BackgroundTasks):
             f.write(html)
         
         # 3. Kick off HITL email loop in background
-        background_tasks.add_task(review_loop, subject, html, recipients)
+        background_tasks.add_task(_review_loop_background, subject, html, recipients)
 
         # 4. Return immediate success
         return {
