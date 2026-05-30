@@ -10,13 +10,29 @@ from dotenv import load_dotenv
 from .config import settings
 from .llm import OllamaClient, ChatMessage
 from .research import initial_research, research_topics
-from .writer import plan_title_and_topics, write_section, merge_sections_to_html, add_images_to_html, enforce_on_topic_and_length
+from .writer import plan_title_and_topics, write_section, merge_sections_to_html, add_images_to_html, enforce_on_topic_and_length, voice_polish_html
+from .image_gen import generate_images
 from .hitl import review_loop
 from .email_client import send_email
 from bs4 import BeautifulSoup
 
 
+def _validate_words_limit(words_limit: int | None) -> int | None:
+    if words_limit is None:
+        return None
+    try:
+        value = int(words_limit)
+    except Exception:
+        raise ValueError("Words must be an integer.")
+    min_w = max(0, settings.min_words)
+    max_w = max(min_w, settings.max_words)
+    if value < min_w or value > max_w:
+        raise ValueError(f"Words must be between {min_w} and {max_w}.")
+    return value
+
+
 def build_newsletter(prompt: str, words_limit: int | None = None) -> tuple[str, str]:
+    words_limit = _validate_words_limit(words_limit)
     # Initial research
     init = initial_research(prompt)
     articles_blob = json.dumps(init, indent=2)
@@ -42,9 +58,22 @@ def build_newsletter(prompt: str, words_limit: int | None = None) -> tuple[str, 
 
     subject, html_body = merge_sections_to_html(title, sections, words_limit=words_limit)
     html_body = add_images_to_html(html_body, all_images)
+    # Optional local image generation (data-URI) for preview or non-email usage
+    try:
+        local_images = generate_images(prompt)
+        if local_images:
+            html_body = add_images_to_html(html_body, local_images)
+    except Exception:
+        # If local image generation fails, fall back silently to research images
+        pass
     # Enforce on-topic coverage and length
     required_terms = ["Zoox", "Waymo", "Tesla", "robotaxi", "Washington", "safety", "regulatory", "mobility-as-a-service"]
     html_body = enforce_on_topic_and_length(html_body, prompt, required_terms, target_words=words_limit)
+    if settings.voice_polish:
+        # One or more passes to lock in voice without altering structure
+        passes = max(1, settings.voice_polish_passes)
+        for _ in range(passes):
+            html_body = voice_polish_html(html_body, prompt, words_limit=words_limit)
     return subject, html_body
 
 

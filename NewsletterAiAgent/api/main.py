@@ -6,12 +6,15 @@ import tempfile
 import time
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 
 from newsletter.run import build_newsletter
 from newsletter.hitl import review_loop
-from newsletter.email_client import validate_email_settings
+from newsletter.config import settings
+from newsletter.writer import revise_with_feedback
+from newsletter.email_client import validate_email_settings, send_email
 
 app = FastAPI()
 
@@ -24,13 +27,19 @@ def read_root():
 @app.get("/models")
 def list_models():
     try:
-        from NewsletterAiAgent.src.newsletter.llm import _get_gemini_client
+        if (settings.llm_provider or "ollama").lower() == "ollama":
+            import requests
+            url = settings.ollama_host.rstrip("/") + "/api/tags"
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            models = [m.get("name") for m in data.get("models", []) if isinstance(m, dict) and m.get("name")]
+            return {"models": models}
+        # fallback to gemini list when configured
+        from newsletter.llm import _get_gemini_client
         client = _get_gemini_client()
         models = []
         for m in client.models.list():
-            # Just return the name (or display_name if available)
-            # The SDK object likely has 'name', 'display_name'.
-            # To be safe, we'll try to get name, or fallback to str(m)
             name = getattr(m, 'name', str(m))
             models.append(name)
         return {"models": models}
@@ -49,6 +58,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve generated images for email-friendly hosting
+os.makedirs(settings.image_storage_dir, exist_ok=True)
+app.mount("/images", StaticFiles(directory=settings.image_storage_dir), name="images")
+
 
 class BuildReq(BaseModel):
     prompt: str
@@ -60,8 +73,22 @@ class SendReq(BaseModel):
     words: Optional[int] = None
 
 
+def clean_subject(subject: str) -> str:
+    """Remove markdown backticks and 'json' prefix if LLM includes them."""
+    s = subject.strip()
+    if s.startswith("```"):
+        s = s.strip("`").strip()
+        if s.lower().startswith("json"):
+            s = s[4:].strip()
+    return s.split('\n')[0].strip()
+
+
 class PublishReq(BaseModel):
     token: str
+
+
+class ReviseReq(BaseModel):
+    feedback: str
 
 
 def _review_loop_background(subject: str, html: str, recipients: list[str]):
@@ -177,37 +204,127 @@ def diag_config():
 def build(req: BuildReq):
     try:
         subject, html = build_newsletter(req.prompt, words_limit=req.words)
-        return {'subject': subject, 'html': html}
+        return {'subject': clean_subject(subject), 'html': html}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post('/send')
 def send(req: SendReq, background_tasks: BackgroundTasks):
     try:
-        # Fail fast if SMTP is not configured so the frontend sees an error instead of a silent background failure
-        validate_email_settings()
-
-        # 1. Generate the newsletter logic synchronously to catch basic errors immediately
+        # 1. Generate the newsletter logic synchronously
         subject, html = build_newsletter(req.prompt, words_limit=req.words)
         
-        # 2. Start the Blocking HITL review loop in the background
-        recipients = os.getenv('RECIPIENTS', '').split(',') if os.getenv('RECIPIENTS') else [os.getenv('SMTP_USERNAME')]
+        # 2. Determine recipients and start HITL email loop in background
+        recipients = settings.default_recipients or []
+        if not recipients:
+            fallback = settings.smtp_username or settings.from_email
+            recipients = [fallback] if fallback else []
+        if not recipients:
+            raise RuntimeError("No recipients configured. Set RECIPIENTS or SMTP_USERNAME/FROM_EMAIL.")
         
-        background_tasks.add_task(_review_loop_background, subject, html, recipients)
+        status_path = os.path.join(os.getcwd(), 'hitl_status.json')
+        data = {
+            'status': 'waiting_approval',
+            'subject': clean_subject(subject),
+            'html': html,
+            'recipients': recipients,
+            'updated_at': time.time(),
+        }
+        with open(status_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+            
+        # Also save to the html files used by /publish
+        with open(os.path.join(os.getcwd(), 'generated_from_prompt.html'), 'w', encoding='utf-8') as f:
+            f.write(html)
         
-        # 3. Return immediate success so frontend doesn't timeout
+        # 3. Kick off HITL email loop in background
+        background_tasks.add_task(review_loop, subject, html, recipients)
+
+        # 4. Return immediate success
         return {
-            'status': 'background_process_started',
+            'status': 'waiting_approval',
             'subject': subject,
             'html': html,
-            'message': 'Review loop started in background. Check your email.'
+            'message': 'Draft generated and waiting for frontend approval.'
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post('/approve')
+def approve():
+    try:
+        # 1. Load the draft from hitl_status.json
+        status_path = os.path.join(os.getcwd(), 'hitl_status.json')
+        if not os.path.exists(status_path):
+            raise HTTPException(status_code=404, detail="No draft found to approve.")
+            
+        with open(status_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        if data.get('status') != 'waiting_approval':
+             raise HTTPException(status_code=400, detail=f"Cannot approve in status: {data.get('status')}")
+
+        # 2. Send the final email
+        validate_email_settings()
+        subject = data['subject']
+        html = data['html']
+        recipients = data['recipients']
+        
+        send_email(subject, html, recipients)
+        
+        # 3. Update status to approved
+        data['status'] = 'approved'
+        data['updated_at'] = time.time()
+        with open(status_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+            
+        return {"status": "approved", "message": "Final email sent successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post('/revise')
+def revise(req: ReviseReq):
+    try:
+        # 1. Load the current draft
+        status_path = os.path.join(os.getcwd(), 'hitl_status.json')
+        if not os.path.exists(status_path):
+            raise HTTPException(status_code=404, detail="No draft found to revise.")
+            
+        with open(status_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        # 2. Revise with feedback
+        current_html = data['html']
+        revised_subject, revised_html = revise_with_feedback(current_html, req.feedback)
+        
+        # 3. Update hitl_status.json
+        data['subject'] = clean_subject(revised_subject) if revised_subject else data['subject']
+        data['html'] = revised_html
+        data['status'] = 'waiting_approval'
+        data['feedback'] = req.feedback
+        data['updated_at'] = time.time()
+        
+        with open(status_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+            
+        # Update html file
+        with open(os.path.join(os.getcwd(), 'generated_from_prompt.html'), 'w', encoding='utf-8') as f:
+            f.write(revised_html)
+            
+        return {
+            'status': 'waiting_approval',
+            'subject': data['subject'],
+            'html': data['html'],
+            'message': 'Draft revised and waiting for frontend approval.'
         }
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
