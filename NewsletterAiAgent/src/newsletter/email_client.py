@@ -179,7 +179,16 @@ def _search_mailbox_for_token(m: imaplib.IMAP4_SSL, mailbox: str, token: str, si
                         body_text = msg.get_payload(decode=True).decode(errors='ignore')
                     except Exception:
                         body_text = str(msg.get_payload())
-                return subject, body_text
+                
+                # Extract only the first meaningful line (before quoted text starts)
+                # Gmail adds "On ... wrote:" before quoting the original email
+                first_line = body_text.split('\n')[0].strip() if body_text else ""
+                # If first line is empty or looks like a quote marker, try second line
+                if not first_line or 'wrote:' in first_line or first_line.startswith('On '):
+                    lines = [l.strip() for l in body_text.split('\n') if l.strip() and 'wrote:' not in l and not l.startswith('On ')]
+                    first_line = lines[0] if lines else body_text
+                
+                return subject, first_line
     return None, None
 
 

@@ -83,6 +83,8 @@ def review_loop(initial_subject: str, html: str, recipients: List[str]) -> Tuple
             return initial_subject, html
 
         # Received a non-approval reply — decide whether to revise or keep waiting
+        print(f"DEBUG: Raw body_text extracted: {repr(body_text)}")
+        print(f"DEBUG: Subject from reply: {repr(subject)}")
         print("Received feedback; evaluating whether to revise or wait for explicit 'approve'...")
         t = (body_text or "").lower()
         declined_phrases = [
