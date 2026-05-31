@@ -17,6 +17,18 @@ class ReviewResult:
     feedback: str | None = None
 
 
+def _write_status(html: str, **fields):
+    """Helper to write hitl_status.json with consistent structure including HTML."""
+    fields.setdefault("updated_at", _time.time())
+    fields["html"] = html
+    try:
+        status_path = os.path.join(os.getcwd(), "hitl_status.json")
+        with open(status_path, "w", encoding="utf-8") as f:
+            json.dump(fields, f, indent=2)
+    except Exception:
+        pass
+
+
 def classify_feedback(text: str) -> bool:
     # Simple heuristic; could be upgraded to LLM classification.
     t = (text or "").lower()
@@ -40,16 +52,8 @@ def review_loop(initial_subject: str, html: str, recipients: List[str]) -> Tuple
     print(f"Draft sent to {', '.join(recipients)} with subject: '{initial_subject} (Draft)'")
     print(f"Tracking token: [ref:{token}] — waiting up to {settings.poll_timeout_minutes} minutes for your reply (poll every {settings.poll_interval_seconds}s)...")
     try:
-        status_path = os.path.join(os.getcwd(), "hitl_status.json")
-        with open(status_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "status": "waiting",
-                "token": token,
-                "subject": initial_subject + " (Draft)",
-                "recipients": recipients,
-                "since_ts": send_time,
-                "updated_at": _time.time(),
-            }, f, indent=2)
+        _write_status(html, status="waiting", token=token, subject=initial_subject + " (Draft)",
+                      recipients=recipients, since_ts=send_time)
     except Exception:
         pass
     # New behavior: do not auto-revise. Wait for an explicit 'approve' reply.
@@ -59,16 +63,8 @@ def review_loop(initial_subject: str, html: str, recipients: List[str]) -> Tuple
             # Timeout or no reply; send Unapproved Final
             print("No reply received before timeout. Sending the last version as Unapproved Final.")
             try:
-                status_path = os.path.join(os.getcwd(), "hitl_status.json")
-                with open(status_path, "w", encoding="utf-8") as f:
-                    json.dump({
-                        "status": "timeout",
-                        "token": token,
-                        "subject": initial_subject + " (Unapproved Final)",
-                        "recipients": recipients,
-                        "since_ts": send_time,
-                        "updated_at": _time.time(),
-                    }, f, indent=2)
+                _write_status(html, status="timeout", token=token, subject=initial_subject + " (Unapproved Final)",
+                              recipients=recipients, since_ts=send_time)
             except Exception:
                 pass
             break
@@ -80,16 +76,8 @@ def review_loop(initial_subject: str, html: str, recipients: List[str]) -> Tuple
             send_email(initial_subject, html, recipients)
             print("Approval received. Final email sent.")
             try:
-                status_path = os.path.join(os.getcwd(), "hitl_status.json")
-                with open(status_path, "w", encoding="utf-8") as f:
-                    json.dump({
-                        "status": "approved",
-                        "token": token,
-                        "subject": initial_subject,
-                        "recipients": recipients,
-                        "since_ts": send_time,
-                        "updated_at": _time.time(),
-                    }, f, indent=2)
+                _write_status(html, status="approved", token=token, subject=initial_subject,
+                              recipients=recipients, since_ts=send_time)
             except Exception:
                 pass
             return initial_subject, html
@@ -118,16 +106,8 @@ def review_loop(initial_subject: str, html: str, recipients: List[str]) -> Tuple
             token = send_email(initial_subject + " (Draft)", html, recipients)
             print(f"Revised draft sent. New subject: '{initial_subject} (Draft)'. New token: [ref:{token}] — awaiting reply...")
             try:
-                status_path = os.path.join(os.getcwd(), "hitl_status.json")
-                with open(status_path, "w", encoding="utf-8") as f:
-                    json.dump({
-                        "status": "waiting",
-                        "token": token,
-                        "subject": initial_subject + " (Draft)",
-                        "recipients": recipients,
-                        "since_ts": send_time,
-                        "updated_at": _time.time(),
-                    }, f, indent=2)
+                _write_status(html, status="waiting", token=token, subject=initial_subject + " (Draft)",
+                              recipients=recipients, since_ts=send_time, feedback=body_text)
             except Exception:
                 pass
             # continue waiting loop
@@ -135,33 +115,16 @@ def review_loop(initial_subject: str, html: str, recipients: List[str]) -> Tuple
 
         # Otherwise, record feedback and keep waiting for explicit approval
         try:
-            status_path = os.path.join(os.getcwd(), "hitl_status.json")
-            with open(status_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "status": "feedback_received",
-                    "token": token,
-                    "subject": initial_subject + " (Draft)",
-                    "recipients": recipients,
-                    "feedback": body_text,
-                    "since_ts": send_time,
-                    "updated_at": _time.time(),
-                }, f, indent=2)
+            _write_status(html, status="feedback_received", token=token, subject=initial_subject + " (Draft)",
+                          recipients=recipients, feedback=body_text, since_ts=send_time)
         except Exception:
             pass
     # If loop exits without approval, send last best
     send_email(initial_subject + " (Unapproved Final)", html, recipients)
     print("Unapproved Final sent.")
     try:
-        status_path = os.path.join(os.getcwd(), "hitl_status.json")
-        with open(status_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "status": "sent_unapproved",
-                "token": token,
-                "subject": initial_subject + " (Unapproved Final)",
-                "recipients": recipients,
-                "since_ts": send_time,
-                "updated_at": _time.time(),
-            }, f, indent=2)
+        _write_status(html, status="sent_unapproved", token=token, subject=initial_subject + " (Unapproved Final)",
+                      recipients=recipients, since_ts=send_time)
     except Exception:
         pass
     return initial_subject, html

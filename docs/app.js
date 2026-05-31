@@ -134,18 +134,18 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ prompt, words })
         });
         const ct = resp.headers.get('content-type') || '';
-        if (ct.includes('application/json')) {
+        if (resp.ok && ct.includes('application/json')) {
           const data = await resp.json();
           const subEl = el('subject');
           if (subEl) subEl.textContent = data.subject || 'Newsletter';
           const previewEl = el('preview');
           if (previewEl) previewEl.srcdoc = data.html || '';
-          setStatus('Send complete. See status panel for approval.');
+          setStatus('Draft emailed. Reply to it; the final will appear here once approved.');
           setChip('chipSent', 'Draft sent', 'success');
-          toast('Draft sent for HITL review.', 'success');
+          toast('Draft emailed for HITL review.', 'success');
         } else {
           const txt = await resp.text();
-          toast(`Send returned ${resp.status}: ${txt.substring(0, 200)}`, 'error');
+          toast(`Send failed ${resp.status}: ${txt.substring(0, 200)}`, 'error');
           setChip('chipSent', 'Send error', 'warn');
         }
       } catch (e) {
@@ -220,6 +220,18 @@ async function pollStatus() {
       const s = await resp.json();
       const txt = s.status || 'none';
       setStatus(`Status: ${txt}`);
+
+      if (s.html) {
+        const previewEl = el('preview');
+        if (previewEl && previewEl.srcdoc !== s.html) previewEl.srcdoc = s.html;
+        const subEl = el('subject');
+        if (subEl && s.subject) subEl.textContent = s.subject;
+        window.__lastBuiltHTML = s.html;
+        window.__lastBuiltSubject = s.subject || window.__lastBuiltSubject;
+        const dlBtn = el('download');
+        if (dlBtn) dlBtn.disabled = false;
+      }
+
       const statusPanel = el('statusPanel');
       if (statusPanel) {
         statusPanel.innerHTML = `
@@ -236,7 +248,8 @@ async function pollStatus() {
         setChip('chipApproved', 'Not approved', 'info');
       }
       if (txt === 'approved') {
-        setChip('chipApproved', 'Approved', 'success');
+        setChip('chipApproved', 'Approved — final shown', 'success');
+        toast('Approved. The final newsletter is now in the preview.', 'success');
       }
       if (txt === 'feedback_received') {
         setChip('chipSent', 'Feedback received', 'info');

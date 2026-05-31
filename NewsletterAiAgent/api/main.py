@@ -82,70 +82,43 @@ def _review_loop_background(subject: str, html: str, recipients: list[str]):
 
 @app.get('/diag/email')
 def diag_email(send_test: bool = False):
-    """Email diagnostic.
-    - SMTP: NOOP ping after auth; send_test=1 sends a short plain text email.
-    - Resend: send_test=1 performs a minimal API send; otherwise returns status.
+    """Email diagnostic for SMTP.
+    - NOOP ping after auth
+    - send_test=1 sends a short plain text email
     """
     from newsletter.config import settings
+    from newsletter.email_client import _smtp_client
+    from email.mime.text import MIMEText
+    import email.utils as eut
+    
     try:
-        if settings.email_sender == 'resend' and settings.resend_api_key:
-            # Resend path
-            if not send_test:
-                return {"status": "ok", "sender": "resend"}
-            # Perform a small test send via Resend
-            to_addr = settings.smtp_username or settings.from_email
-            if not to_addr:
-                raise RuntimeError("No SMTP_USERNAME or FROM_EMAIL configured for test send")
-            import requests
-            url = "https://api.resend.com/emails"
-            headers = {
-                "Authorization": f"Bearer {settings.resend_api_key}",
-                "Content-Type": "application/json",
-            }
-            payload = {
-                "from": f"{settings.from_name} <{settings.from_email}>",
-                "to": [to_addr],
-                "subject": "NewsletterAiAgent Resend test",
-                "text": f"Resend test at {int(time.time())}",
-            }
-            resp = requests.post(url, json=payload, headers=headers, timeout=30)
-            if resp.status_code >= 400:
-                raise RuntimeError(f"Resend error {resp.status_code}: {resp.text}")
-            return {"status": "ok", "sender": "resend", "test_send": {"to": to_addr, "accepted": True}}
-        else:
-            # SMTP path
-            validate_email_settings()
-            from newsletter.email_client import _smtp_client
-            from email.mime.text import MIMEText
-            import email.utils as eut
+        validate_email_settings()
+        with _smtp_client() as server:
+            code, resp = server.noop()
+            result = {"status": "ok", "noop": int(code), "server": str(resp), "sender": "smtp"}
 
-            with _smtp_client() as server:
-                # Lightweight ping
-                code, resp = server.noop()
-                result = {"status": "ok", "noop": int(code), "server": str(resp), "sender": "smtp"}
+            if send_test:
+                to_addr = settings.smtp_username or settings.from_email
+                if not to_addr:
+                    raise RuntimeError("No SMTP_USERNAME or FROM_EMAIL configured for test send")
+                subj = "NewsletterAiAgent SMTP test"
+                body = f"SMTP test from /diag/email?send_test=1 at {int(time.time())}."
+                msg = MIMEText(body, 'plain', 'utf-8')
+                msg['From'] = f"{settings.from_name} <{settings.from_email or settings.smtp_username}>"
+                msg['To'] = to_addr
+                msg['Subject'] = subj
+                msg['Date'] = eut.formatdate(localtime=True)
+                msg['Reply-To'] = settings.from_email or settings.smtp_username or ""
 
-                if send_test:
-                    to_addr = settings.smtp_username or settings.from_email
-                    if not to_addr:
-                        raise RuntimeError("No SMTP_USERNAME or FROM_EMAIL configured for test send")
-                    subj = "NewsletterAiAgent SMTP test"
-                    body = f"SMTP test from /diag/email?send_test=1 at {int(time.time())}."
-                    msg = MIMEText(body, 'plain', 'utf-8')
-                    msg['From'] = f"{settings.from_name} <{settings.from_email or settings.smtp_username}>"
-                    msg['To'] = to_addr
-                    msg['Subject'] = subj
-                    msg['Date'] = eut.formatdate(localtime=True)
-                    msg['Reply-To'] = settings.from_email or settings.smtp_username or ""
+                envelope_from = settings.smtp_username or settings.from_email
+                refused = server.sendmail(envelope_from, [to_addr], msg.as_string())
+                if refused:
+                    refused_codes = {k: int(v[0]) for k, v in refused.items()}
+                    result["test_send"] = {"to": to_addr, "accepted": False, "refused": refused_codes}
+                else:
+                    result["test_send"] = {"to": to_addr, "accepted": True}
 
-                    envelope_from = settings.smtp_username or settings.from_email
-                    refused = server.sendmail(envelope_from, [to_addr], msg.as_string())
-                    if refused:
-                        refused_codes = {k: int(v[0]) for k, v in refused.items()}
-                        result["test_send"] = {"to": to_addr, "accepted": False, "refused": refused_codes}
-                    else:
-                        result["test_send"] = {"to": to_addr, "accepted": True}
-
-                return result
+            return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -190,7 +163,10 @@ def send(req: SendReq, background_tasks: BackgroundTasks):
         subject, html = build_newsletter(req.prompt, words_limit=req.words)
         
         # 2. Start the Blocking HITL review loop in the background
-        recipients = os.getenv('RECIPIENTS', '').split(',') if os.getenv('RECIPIENTS') else [os.getenv('SMTP_USERNAME')]
+        from newsletter.config import settings
+        recipients = settings.default_recipients or ([settings.smtp_username] if settings.smtp_username else [])
+        if not recipients:
+            raise HTTPException(status_code=400, detail="No recipients configured (set RECIPIENTS)")
         
         background_tasks.add_task(_review_loop_background, subject, html, recipients)
         
