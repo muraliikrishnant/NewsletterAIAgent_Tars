@@ -82,17 +82,32 @@ def _review_loop_background(subject: str, html: str, recipients: list[str]):
 
 @app.get('/diag/email')
 def diag_email(send_test: bool = False):
-    """Email diagnostic for SMTP.
-    - NOOP ping after auth
-    - send_test=1 sends a short plain text email
+    """Email diagnostic for SendGrid or SMTP.
+    - SendGrid: uses API
+    - SMTP: NOOP ping after auth (local dev fallback)
     """
     from newsletter.config import settings
-    from newsletter.email_client import _smtp_client
+    from newsletter.email_client import _smtp_client, _send_via_sendgrid
     from email.mime.text import MIMEText
     import email.utils as eut
     
     try:
         validate_email_settings()
+        
+        # SendGrid path (production on Render)
+        if settings.sendgrid_api_key:
+            result = {"status": "ok", "sender": "sendgrid"}
+            if send_test:
+                to_addr = settings.from_email
+                if not to_addr:
+                    raise RuntimeError("No FROM_EMAIL configured for test send")
+                subj = f"NewsletterAiAgent SendGrid test {int(time.time())}"
+                body = "<p>Test from /diag/email?send_test=1</p>"
+                _send_via_sendgrid(subj, body, [to_addr])
+                result["test_send"] = {"to": to_addr, "accepted": True}
+            return result
+        
+        # SMTP path (local dev fallback)
         with _smtp_client() as server:
             code, resp = server.noop()
             result = {"status": "ok", "noop": int(code), "server": str(resp), "sender": "smtp"}
@@ -125,13 +140,14 @@ def diag_email(send_test: bool = False):
 
 @app.get('/diag/config')
 def diag_config():
-    """Show loaded SMTP/IMAP config (redacted, no secrets exposed)."""
+    """Show loaded config (redacted, no secrets exposed)."""
     from newsletter.config import settings
     return {
         "smtp_host": settings.smtp_host or "(not set)",
         "smtp_port": settings.smtp_port,
         "smtp_username": settings.smtp_username or "(not set)",
         "smtp_password": "***" if settings.smtp_password else "(not set)",
+        "sendgrid_api_key": "***" if settings.sendgrid_api_key else "(not set)",
         "from_email": settings.from_email or "(not set)",
         "from_name": settings.from_name,
         "imap_host": settings.imap_host or "(not set)",

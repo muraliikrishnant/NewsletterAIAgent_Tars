@@ -257,6 +257,10 @@ async function pollStatus() {
       if (txt === 'timeout' || txt === 'sent_unapproved') {
         setChip('chipApproved', 'Unapproved final sent', 'warn');
       }
+      if (txt === 'error') {
+        setChip('chipSent', 'HITL error', 'warn');
+        setStatus(`Status: error — ${s.error || 'unknown error'}`);
+      }
     }
   } catch (e) {
     // Silent fail for polling

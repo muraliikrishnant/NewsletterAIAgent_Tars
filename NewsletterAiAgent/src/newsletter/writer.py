@@ -45,7 +45,9 @@ def plan_title_and_topics(articles_blob: str) -> Dict[str, Any]:
     # Attempt to parse JSON in the reply; if not JSON, try to extract with regex
     import json
     try:
-        data = json.loads(response)
+        # Strip markdown code fences if present
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.strip(), flags=re.DOTALL)
+        data = json.loads(cleaned)
         assert isinstance(data, dict)
         assert isinstance(data.get("title"), str)
         topics = data.get("topics")
