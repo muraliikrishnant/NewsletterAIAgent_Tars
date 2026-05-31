@@ -159,28 +159,33 @@ def _search_mailbox_for_token(m: imaplib.IMAP4_SSL, mailbox: str, token: str, si
                             continue
                     except Exception:
                         pass
-                # Extract body text - get the first text part only
+                # Extract body text - get ONLY direct payload, not nested parts
                 body_text = ""
                 if msg.is_multipart():
-                    # Extract first text/plain part (usually the user's reply)
-                    for part in msg.walk():
-                        ctype = part.get_content_type()
-                        if ctype == 'text/plain':
-                            try:
-                                body_text = part.get_payload(decode=True).decode(errors='ignore')
-                                break  # Use only first text/plain part
-                            except Exception:
-                                pass
-                    # If no text/plain, try text/html
-                    if not body_text:
-                        for part in msg.walk():
-                            ctype = part.get_content_type()
-                            if ctype == 'text/html':
-                                try:
-                                    body_text = part.get_payload(decode=True).decode(errors='ignore')
-                                    break
-                                except Exception:
-                                    pass
+                    # Get only the first DIRECT child that's text (not nested walks)
+                    payload = msg.get_payload()
+                    if isinstance(payload, list):
+                        # Multiple parts - take first text/plain or text/html
+                        for part in payload:
+                            if isinstance(part, email.message.Message):
+                                ctype = part.get_content_type()
+                                if ctype == 'text/plain':
+                                    try:
+                                        body_text = part.get_payload(decode=True).decode(errors='ignore')
+                                        break
+                                    except Exception:
+                                        pass
+                        # If no text/plain found, try text/html
+                        if not body_text:
+                            for part in payload:
+                                if isinstance(part, email.message.Message):
+                                    ctype = part.get_content_type()
+                                    if ctype == 'text/html':
+                                        try:
+                                            body_text = part.get_payload(decode=True).decode(errors='ignore')
+                                            break
+                                        except Exception:
+                                            pass
                 else:
                     try:
                         body_text = msg.get_payload(decode=True).decode(errors='ignore')
