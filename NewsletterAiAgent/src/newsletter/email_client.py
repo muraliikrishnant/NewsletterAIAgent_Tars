@@ -159,21 +159,28 @@ def _search_mailbox_for_token(m: imaplib.IMAP4_SSL, mailbox: str, token: str, si
                             continue
                     except Exception:
                         pass
-                # Extract body text
+                # Extract body text - get the first text part only
                 body_text = ""
                 if msg.is_multipart():
+                    # Extract first text/plain part (usually the user's reply)
                     for part in msg.walk():
                         ctype = part.get_content_type()
                         if ctype == 'text/plain':
                             try:
-                                body_text += part.get_payload(decode=True).decode(errors='ignore')
-                            except Exception:
-                                pass
-                        elif ctype == 'text/html' and not body_text:
-                            try:
                                 body_text = part.get_payload(decode=True).decode(errors='ignore')
+                                break  # Use only first text/plain part
                             except Exception:
                                 pass
+                    # If no text/plain, try text/html
+                    if not body_text:
+                        for part in msg.walk():
+                            ctype = part.get_content_type()
+                            if ctype == 'text/html':
+                                try:
+                                    body_text = part.get_payload(decode=True).decode(errors='ignore')
+                                    break
+                                except Exception:
+                                    pass
                 else:
                     try:
                         body_text = msg.get_payload(decode=True).decode(errors='ignore')
@@ -181,14 +188,31 @@ def _search_mailbox_for_token(m: imaplib.IMAP4_SSL, mailbox: str, token: str, si
                         body_text = str(msg.get_payload())
                 
                 # Extract only the first meaningful line (before quoted text starts)
-                # Gmail adds "On ... wrote:" before quoting the original email
-                first_line = body_text.split('\n')[0].strip() if body_text else ""
-                # If first line is empty or looks like a quote marker, try second line
-                if not first_line or 'wrote:' in first_line or first_line.startswith('On '):
-                    lines = [l.strip() for l in body_text.split('\n') if l.strip() and 'wrote:' not in l and not l.startswith('On ')]
-                    first_line = lines[0] if lines else body_text
+                # Gmail replies have format: "User reply text" followed by separator then quoted original
+                # Look for the reply text before any of these markers:
+                # - "On ... wrote:" (Gmail's quote marker)
+                # - "---" (common separator)
+                # - ">" (quote prefix)
+                # - Empty line before quoted section
                 
-                return subject, first_line
+                first_meaningful = ""
+                for line in body_text.split('\n'):
+                    line = line.strip()
+                    # Stop at quote markers
+                    if line.startswith('On ') and 'wrote:' in line:
+                        break
+                    if line.startswith('---') or line.startswith('>'):
+                        break
+                    if line and not first_meaningful:
+                        first_meaningful = line
+                    elif first_meaningful and line:
+                        # Continue collecting non-empty lines until we hit a separator
+                        first_meaningful += " " + line
+                    elif first_meaningful and not line:
+                        # Empty line typically marks end of reply before quote
+                        break
+                
+                return subject, first_meaningful if first_meaningful else body_text
     return None, None
 
 

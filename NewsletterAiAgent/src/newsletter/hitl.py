@@ -71,6 +71,8 @@ def review_loop(initial_subject: str, html: str, recipients: List[str]) -> Tuple
 
         # If we receive any reply text, check for explicit 'approve' keyword
         t = (body_text or "").lower()
+        print(f"DEBUG: Reply body_text (first 500 chars): {repr(body_text[:500] if body_text else None)}")
+        print(f"DEBUG: Checking for 'approve' in: {repr(t[:200])}")
         if "approve" in t or "approved" in t or "looks good" in t or "go ahead" in t:
             # Send final
             send_email(initial_subject, html, recipients)
