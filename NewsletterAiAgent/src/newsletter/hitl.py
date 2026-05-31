@@ -58,7 +58,7 @@ def review_loop(initial_subject: str, html: str, recipients: List[str]) -> Tuple
         pass
     # New behavior: do not auto-revise. Wait for an explicit 'approve' reply.
     while True:
-        _, body_text = poll_feedback(token, since_ts=send_time)
+        reply_subject, body_text = poll_feedback(token, since_ts=send_time)
         if not body_text:
             # Timeout or no reply; send Unapproved Final
             print("No reply received before timeout. Sending the last version as Unapproved Final.")
@@ -84,7 +84,7 @@ def review_loop(initial_subject: str, html: str, recipients: List[str]) -> Tuple
 
         # Received a non-approval reply — decide whether to revise or keep waiting
         print(f"DEBUG: Raw body_text extracted: {repr(body_text)}")
-        print(f"DEBUG: Subject from reply: {repr(subject)}")
+        print(f"DEBUG: Subject from reply: {repr(reply_subject)}")
         print("Received feedback; evaluating whether to revise or wait for explicit 'approve'...")
         t = (body_text or "").lower()
         declined_phrases = [
