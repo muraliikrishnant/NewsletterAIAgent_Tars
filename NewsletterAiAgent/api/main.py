@@ -24,16 +24,12 @@ def read_root():
 @app.get("/models")
 def list_models():
     try:
-        from NewsletterAiAgent.src.newsletter.llm import _get_gemini_client
-        client = _get_gemini_client()
-        models = []
-        for m in client.models.list():
-            # Just return the name (or display_name if available)
-            # The SDK object likely has 'name', 'display_name'.
-            # To be safe, we'll try to get name, or fallback to str(m)
-            name = getattr(m, 'name', str(m))
-            models.append(name)
-        return {"models": models}
+        import requests
+        from newsletter.config import settings
+        url = f"{settings.ollama_host.rstrip('/')}/api/tags"
+        resp = requests.get(url, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
     except Exception as e:
         return {"error": str(e)}
 

@@ -18,12 +18,9 @@ def _default_recipients() -> List[str]:
 class Settings:
     # LLM
     ollama_host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-    ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct")
-    llm_provider: str = os.getenv("LLM_PROVIDER", "ollama")  # 'ollama' or 'gemini'
-
-    # Gemini
-    gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "gemma4:31b-cloud")
+    ollama_api_key: str | None = os.getenv("OLLAMA_API_KEY")
+    llm_provider: str = "ollama"  # hard-locked: Ollama Gemma 4 Cloud only
 
     # Research (Tavily)
     tavily_api_key: str | None = os.getenv("TAVILY_API_KEY")

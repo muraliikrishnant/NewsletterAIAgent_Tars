@@ -51,10 +51,6 @@ class OllamaClient:
 
 
 def simple_chat(system: str, user: str) -> str:
-    provider = (settings.llm_provider or "ollama").lower()
-    if provider == "gemini":
-        return _gemini_chat(system, user)
-    # default: ollama
     client = OllamaClient()
     return client.chat([
         ChatMessage(role="system", content=system),
@@ -85,8 +81,10 @@ def _load_style_assets(style_name: str = "bartlett_hormozi") -> tuple[str, list]
     return guide, examples
 
 
+
+
 def generate_with_style(task_prompt: str, style_name: str = "bartlett_hormozi") -> str:
-    """Compose a prompt using the selected style guide and few-shot examples and call the default chat provider."""
+    """Compose a prompt using the selected style guide and few-shot examples and call Ollama."""
     guide, examples = _load_style_assets(style_name)
     system_parts = [guide] if guide else []
     # include example prompts in system message to bias the model
@@ -96,68 +94,4 @@ def generate_with_style(task_prompt: str, style_name: str = "bartlett_hormozi") 
         if p and out:
             system_parts.append(f"Example prompt:\n{p}\nExample output:\n{out}")
     system = "\n\n".join([s for s in system_parts if s]) or "You are an expert newsletter writer."
-    # call whichever provider is configured
     return simple_chat(system, task_prompt)
-
-
-# --- Gemini support ---
-_gemini_client_cached = None
-
-def _get_gemini_client():
-    global _gemini_client_cached
-    if _gemini_client_cached is not None:
-        return _gemini_client_cached
-    try:
-        from google import genai
-    except ImportError as e:
-        raise RuntimeError("google-genai package is not installed. Run 'pip install google-genai'.") from e
-    if not settings.gemini_api_key:
-        raise RuntimeError("GEMINI_API_KEY is not set in .env")
-    
-    # Initialize the new Client
-    client = genai.Client(api_key=settings.gemini_api_key)
-    _gemini_client_cached = client
-    return client
-
-
-def _gemini_chat(system: str, user: str) -> str:
-    client = _get_gemini_client()
-    model_name = settings.gemini_model
-    
-    # The new SDK supports system instructions in the generate_content call config in some versions,
-    # but concatenating is still a robust fallback for "chat" behavior in simple generate_content calls
-    # unless we use the ChatSession. For minimizing drift, we'll keep the prompt concatenation or use `contents`.
-    # However, let's try to be cleaner:
-    # prompt = f"System:\n{system}\n\nUser:\n{user}"
-    # BUT, to match previous behavior exactly and avoid complexity with new configs, let's stick to the prompt string for now
-    # or use the config if we were sure about the version. Given the simple usage, string concatenation is safest for migration.
-    
-    prompt = f"System instructions:\n{system}\n\nUser query:\n{user}"
-    
-    last_err = None
-    for attempt in range(4):
-        try:
-            # New SDK call: client.models.generate_content(...)
-            resp = client.models.generate_content(
-                model=model_name,
-                contents=prompt
-            )
-            # Response object usually has .text
-            if hasattr(resp, 'text') and resp.text:
-                return resp.text.strip()
-            
-            # Fallback if text is not directly accessible (e.g. safety blocks or complex parts)
-            # The new SDK might require iterating parts.
-            # But usually .text property coalesces it.
-            return (resp.text or "").strip()
-
-        except Exception as e:
-            last_err = e
-            msg = str(e)
-            # Check for resource exhaustion / rate limits
-            if '429' in msg or 'quota' in msg.lower() or 'exhausted' in msg.lower():
-                time.sleep(2 ** attempt)
-                continue
-            break
-    
-    raise RuntimeError(f"Gemini call failed: {last_err}")
