@@ -82,28 +82,28 @@ def _review_loop_background(subject: str, html: str, recipients: list[str]):
 
 @app.get('/diag/email')
 def diag_email(send_test: bool = False):
-    """Email diagnostic for SendGrid or SMTP.
-    - SendGrid: uses API
+    """Email diagnostic for Resend or SMTP.
+    - Resend: uses API (production on Render)
     - SMTP: NOOP ping after auth (local dev fallback)
     """
     from newsletter.config import settings
-    from newsletter.email_client import _smtp_client, _send_via_sendgrid
+    from newsletter.email_client import _smtp_client, _send_via_resend
     from email.mime.text import MIMEText
     import email.utils as eut
     
     try:
         validate_email_settings()
         
-        # SendGrid path (production on Render)
-        if settings.sendgrid_api_key:
-            result = {"status": "ok", "sender": "sendgrid"}
+        # Resend path (production on Render)
+        if settings.resend_api_key:
+            result = {"status": "ok", "sender": "resend"}
             if send_test:
                 to_addr = settings.from_email
                 if not to_addr:
                     raise RuntimeError("No FROM_EMAIL configured for test send")
-                subj = f"NewsletterAiAgent SendGrid test {int(time.time())}"
+                subj = f"NewsletterAiAgent Resend test {int(time.time())}"
                 body = "<p>Test from /diag/email?send_test=1</p>"
-                _send_via_sendgrid(subj, body, [to_addr])
+                _send_via_resend(subj, body, [to_addr])
                 result["test_send"] = {"to": to_addr, "accepted": True}
             return result
         
@@ -147,7 +147,7 @@ def diag_config():
         "smtp_port": settings.smtp_port,
         "smtp_username": settings.smtp_username or "(not set)",
         "smtp_password": "***" if settings.smtp_password else "(not set)",
-        "sendgrid_api_key": "***" if settings.sendgrid_api_key else "(not set)",
+        "resend_api_key": "***" if settings.resend_api_key else "(not set)",
         "from_email": settings.from_email or "(not set)",
         "from_name": settings.from_name,
         "imap_host": settings.imap_host or "(not set)",

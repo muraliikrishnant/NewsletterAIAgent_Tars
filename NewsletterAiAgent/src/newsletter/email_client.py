@@ -17,9 +17,9 @@ from .config import settings
 
 def validate_email_settings():
     has_smtp = bool(settings.smtp_username and settings.smtp_password and settings.from_email)
-    has_sendgrid = bool(settings.sendgrid_api_key and settings.from_email)
-    if not (has_smtp or has_sendgrid):
-        raise RuntimeError("Configure SMTP credentials or SENDGRID_API_KEY (plus FROM_EMAIL)")
+    has_resend = bool(settings.resend_api_key and settings.from_email)
+    if not (has_smtp or has_resend):
+        raise RuntimeError("Configure SMTP credentials or RESEND_API_KEY (plus FROM_EMAIL)")
     if not (settings.imap_username and settings.imap_password):
         raise RuntimeError("IMAP credentials missing. Configure .env")
 
@@ -70,27 +70,27 @@ def _imap_client() -> imaplib.IMAP4_SSL:
     return m
 
 
-def _send_via_sendgrid(subject_with_token: str, html_body: str, recipients: List[str]) -> None:
-    """Send email via SendGrid API (works on Render free tier)."""
+def _send_via_resend(subject_with_token: str, html_body: str, recipients: List[str]) -> None:
+    """Send email via Resend API (works on Render free tier)."""
     import requests
     payload = {
-        "personalizations": [{"to": [{"email": r} for r in recipients]}],
-        "from": {"email": settings.from_email, "name": settings.from_name},
-        "reply_to": {"email": settings.from_email},
+        "from": f"{settings.from_name} <{settings.from_email}>",
+        "to": recipients,
         "subject": subject_with_token,
-        "content": [{"type": "text/html", "value": html_body}],
+        "html": html_body,
+        "reply_to": settings.from_email,
     }
     resp = requests.post(
-        "https://api.sendgrid.com/v3/mail/send",
+        "https://api.resend.com/emails",
         headers={
-            "Authorization": f"Bearer {settings.sendgrid_api_key}",
+            "Authorization": f"Bearer {settings.resend_api_key}",
             "Content-Type": "application/json",
         },
         json=payload,
         timeout=30,
     )
     if resp.status_code >= 300:
-        raise RuntimeError(f"SendGrid {resp.status_code}: {resp.text}")
+        raise RuntimeError(f"Resend {resp.status_code}: {resp.text}")
 
 
 def send_email(subject: str, html_body: str, recipients: List[str], token: Optional[str] = None) -> str:
@@ -98,8 +98,8 @@ def send_email(subject: str, html_body: str, recipients: List[str], token: Optio
     clean_subj = _sanitize_subject(subject)
     subject_with_token = f"{clean_subj} [ref:{token}]"
 
-    if settings.sendgrid_api_key:
-        _send_via_sendgrid(subject_with_token, html_body, recipients)
+    if settings.resend_api_key:
+        _send_via_resend(subject_with_token, html_body, recipients)
         return token
 
     # SMTP fallback (local dev)
